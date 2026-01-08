@@ -108,27 +108,6 @@ function Landing() {
             </div>
           </div>
         </main>
-
-        {/* Footer */}
-        <footer className="px-6 py-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 text-blue-200 text-sm">
-              <div>
-                <p className="font-medium">Maritime ESG Analytics Platform</p>
-                <p className="text-blue-300 text-xs mt-1">
-                  Research-grade ML pipeline for carbon emission estimation
-                </p>
-              </div>
-              <div className="flex space-x-6 text-xs">
-                <span>Backend: FastAPI</span>
-                <span>•</span>
-                <span>Frontend: React.js</span>
-                <span>•</span>
-                <span>ML: scikit-learn</span>
-              </div>
-            </div>
-          </div>
-        </footer>
       </div>
 
       {/* Animated gradient background accent */}

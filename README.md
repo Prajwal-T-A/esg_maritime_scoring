@@ -1,55 +1,93 @@
-# Maritime ESG Analytics - FastAPI Backend
+# Maritime ESG Analytics Platform
 
-Production-ready FastAPI backend for serving maritime freight carbon emissions and ESG analytics data from Amazon S3 to a React frontend.
+Research-grade ML pipeline for maritime carbon emission estimation and ESG environmental scoring, powered by FastAPI backend and React frontend.
 
 ## Project Overview
 
-This backend API serves processed AIS (Automatic Identification System) data with carbon emissions estimates and ESG environmental scores. The data is stored in Amazon S3 and served via RESTful APIs.
+A full-stack platform for analyzing vessel environmental performance using real AIS (Automatic Identification System) data. The system combines a RandomForest ML model for CO₂ emission predictions with deterministic ESG environmental scoring to provide comprehensive vessel analytics.
 
-## Architecture
+## Tech Stack
 
-- **Framework**: FastAPI (Python)
-- **Cloud Provider**: AWS
-- **Storage**: Amazon S3 (`ai-carbon-esg-data-prajwal`)
-- **Data Location**: `s3://ai-carbon-esg-data-prajwal/processed/features/`
-- **Deployment**: AWS Lambda-ready (can also run locally or on EC2)
+### Backend
+- **Framework**: FastAPI (Python 3.9+)
+- **ML Model**: scikit-learn RandomForest
+- **Cloud**: AWS S3 for data storage
+- **API**: RESTful endpoints with ML prediction integration
+
+### Frontend
+- **Framework**: React.js 18.2.0
+- **Routing**: react-router-dom 6.20.0
+- **Styling**: Tailwind CSS 3.3.6 with glass-morphism design
+- **HTTP Client**: Axios 1.6.2
+
+### ML Pipeline
+- **Model**: RandomForest Regressor
+- **Features**: 9 vessel/operational metrics
+- **Target**: CO₂ emissions (kg)
+- **Scoring**: Deterministic ESG environmental scoring (0-100)
 
 ## Project Structure
 
 ```
 ESG_Scoring_Pipeline/
-├── app/
-│   ├── __init__.py
+├── app/                     # Backend (FastAPI)
 │   ├── main.py              # FastAPI application entry point
 │   ├── config.py            # Configuration and settings
 │   ├── api/
-│   │   ├── __init__.py
-│   │   └── routes.py        # API endpoint definitions
+│   │   └── routes.py        # API endpoints (health, analyze-vessel)
 │   ├── services/
-│   │   ├── __init__.py
 │   │   └── s3_service.py    # S3 data access layer
 │   └── models/
-│       ├── __init__.py
 │       └── schemas.py       # Pydantic data models
+├── frontend/                # Frontend (React)
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── App.jsx          # Main app with routing
+│   │   ├── index.js         # Entry point
+│   │   ├── pages/
+│   │   │   ├── Landing.jsx  # Welcome page
+│   │   │   ├── AnalyzeVessel.jsx  # Main analysis interface
+│   │   │   └── Home.jsx     # Legacy page
+│   │   ├── components/
+│   │   │   ├── ESGScoreCard.jsx
+│   │   │   ├── HealthStatus.jsx
+│   │   │   ├── VesselHistory.jsx
+│   │   │   └── VesselLatest.jsx
+│   │   └── services/
+│   │       └── api.js       # API communication layer
+│   ├── package.json
+│   └── tailwind.config.js   # Custom Tailwind configuration
+├── ml/                      # ML Pipeline
+│   ├── data/
+│   │   └── raw/
+│   │       ├── ais_raw.csv
+│   │       └── emission_factors.csv
+│   └── esg/                 # ESG scoring logic
+├── Test_Files/              # Test JSON samples (gitignored)
 ├── requirements.txt         # Python dependencies
 └── README.md               # This file
 ```
 
-## Data Schema
+## Features
 
-Each AIS record in S3 has the following structure:
+### ML-Powered Predictions
+- RandomForest model predicting CO₂ emissions based on vessel operational data
+- 9 input features: MMSI, speed metrics, distance, time at sea, acceleration events, vessel dimensions, CO₂ factor
+- Research-grade accuracy with real AIS training data
 
-```json
-{
-  "mmsi": "string",
-  "speed_knots": float,
-  "latitude": float,
-  "longitude": float,
-  "timestamp": "ISO 8601 string",
-  "estimated_co2_kg": float,
-  "esg_environment_score": int
-}
-```
+### ESG Environmental Scoring
+- Deterministic scoring algorithm (0-100 scale)
+- Color-coded ratings: Excellent (90+), Good (70+), Fair (50+), Poor (30+), Critical (<30)
+- Environmental risk flags for high emissions, excessive speed, long voyages
+- Actionable recommendations for improvement
+
+### Modern UI/UX
+- Landing page with maritime background and professional glass-morphism design
+- Vessel analysis interface with comprehensive form inputs
+- Real-time results display with ESG gauge, KPI cards, and risk alerts
+- Responsive design with Tailwind CSS
+- No sign-up required for instant analysis
 
 ## API Endpoints
 
@@ -67,7 +105,44 @@ Returns API health status.
 }
 ```
 
-### 2. Latest Vessel Data
+### 2. Analyze Vessel (ML Prediction)
+```
+POST /api/v1/analyze-vessel
+```
+Predict CO₂ emissions and calculate ESG score for a vessel.
+
+**Request Body:**
+```json
+{
+  "mmsi": "123456789",
+  "avg_speed": 12.5,
+  "speed_std": 2.3,
+  "total_distance_km": 450.0,
+  "time_at_sea_hours": 36.0,
+  "acceleration_events": 15,
+  "length": 180.0,
+  "width": 28.0,
+  "draft": 10.5,
+  "co2_factor": 3.2
+}
+```
+
+**Response:**
+```json
+{
+  "mmsi": "123456789",
+  "estimated_co2_kg": 1245.67,
+  "esg_score": 75,
+  "rating": "Good",
+  "description": "Above average environmental performance",
+  "recommendation": "Continue current practices and monitor emissions trends",
+  "risk_flags": ["High average speed detected"]
+}
+```
+
+### 3. Legacy Endpoints (S3 Data)
+
+#### Latest Vessel Data
 ```
 GET /api/v1/vessels/{mmsi}/latest
 ```
@@ -78,7 +153,7 @@ Fetch the most recent AIS record for a specific vessel.
 
 **Response:** AISRecord object
 
-### 3. Vessel History
+#### Vessel History
 ```
 GET /api/v1/vessels/{mmsi}/history
 ```
@@ -89,7 +164,7 @@ Fetch all historical AIS records for a vessel, sorted by timestamp.
 
 **Response:** Array of AISRecord objects
 
-### 4. ESG Metrics
+#### ESG Metrics
 ```
 GET /api/v1/esg/{mmsi}
 ```
@@ -108,27 +183,19 @@ Fetch ESG-specific metrics for a vessel.
 }
 ```
 
-## Setup Instructions
+## Quick Start
 
-### Prerequisites
+### Backend Setup
 
-- Python 3.9 or higher
-- AWS credentials configured (IAM role or environment variables)
-- Access to S3 bucket: `ai-carbon-esg-data-prajwal`
-
-### Installation
-
-1. **Clone or navigate to the project directory:**
+1. **Navigate to project directory:**
    ```bash
    cd /Users/prajwal_t_a/Desktop/Coding/ESG_Scoring_Pipeline
    ```
 
-2. **Create a virtual environment:**
+2. **Create virtual environment:**
    ```bash
    python3 -m venv venv
-   source venv/bin/activate  # On macOS/Linux
-   # or
-   venv\Scripts\activate  # On Windows
+   source venv/bin/activate  # macOS/Linux
    ```
 
 3. **Install dependencies:**
@@ -136,68 +203,119 @@ Fetch ESG-specific metrics for a vessel.
    pip install -r requirements.txt
    ```
 
-4. **Configure AWS credentials:**
-   
-   Option A - Environment variables:
-   ```bash
-   export AWS_ACCESS_KEY_ID=your_access_key
-   export AWS_SECRET_ACCESS_KEY=your_secret_key
-   export AWS_REGION=us-east-1
-   ```
-   
-   Option B - AWS CLI configuration:
-   ```bash
-   aws configure
-   ```
-   
-   Option C - IAM role (when deployed on AWS)
-
-### Running Locally
-
-1. **Start the development server:**
+4. **Start the backend:**
    ```bash
    uvicorn app.main:app --reload
    ```
    
-   Or run directly:
+   Backend will run at `http://localhost:8000`
+   - API docs: `http://localhost:8000/docs`
+
+### Frontend Setup
+
+1. **Navigate to frontend directory:**
    ```bash
-   python -m app.main
+   cd frontend
    ```
 
-2. **Access the API:**
-   - API base URL: `http://localhost:8000`
-   - Swagger UI (interactive docs): `http://localhost:8000/docs`
-   - ReDoc: `http://localhost:8000/redoc`
-
-3. **Test the health endpoint:**
+2. **Install dependencies:**
    ```bash
-   curl http://localhost:8000/api/v1/health
+   npm install
    ```
+
+3. **Start the development server:**
+   ```bash
+   npm start
+   ```
+   
+   Frontend will run at `http://localhost:3000`
+
+### Access the Application
+
+- **Landing Page**: `http://localhost:3000/`
+- **Analyze Vessel**: `http://localhost:3000/analyze`
+- **API Documentation**: `http://localhost:8000/docs`
+
+## Configuration
+
+### AWS S3 (Optional - for legacy endpoints)
+Configure AWS credentials for S3-based endpoints:
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_REGION=us-east-1
+export S3_BUCKET_NAME=ai-carbon-esg-data-prajwal
+```
 
 ### Environment Variables
-
-Optional environment variables for configuration:
-
-- `S3_BUCKET_NAME`: S3 bucket name (default: `ai-carbon-esg-data-prajwal`)
+- `DEBUG`: Enable debug mode (default: `False`)
+- `S3_BUCKET_NAME`: S3 bucket name
 - `S3_PREFIX`: S3 key prefix (default: `processed/features/`)
 - `AWS_REGION`: AWS region (default: `us-east-1`)
-- `DEBUG`: Enable debug mode (default: `False`)
 
-Example:
-```bash
-export S3_BUCKET_NAME=ai-carbon-esg-data-prajwal
-export AWS_REGION=us-east-1
-export DEBUG=True
-```
+## Design System
+
+### Frontend Styling
+- **Design Pattern**: Glass-morphism with backdrop blur effects
+- **Color Palette**: Cyan/blue gradients, transparent overlays, red alerts, green success
+- **Background**: Maritime operations imagery with dark gradient overlay
+- **Cards**: Semi-transparent with subtle white borders (bg-white/10, border-white/30)
+- **Forms**: Transparent inputs with cyan focus rings
+- **Animations**: Fade-in effects (0.8s), pulse animations (3s)
+
+### ESG Score Color Coding
+- **90-100**: Green (Excellent)
+- **70-89**: Lime (Good)
+- **50-69**: Yellow (Fair)
+- **30-49**: Orange (Poor)
+- **0-29**: Red (Critical)
+
+## Data Flow
+
+1. **User Input**: Vessel operational data entered in React form (AnalyzeVessel page)
+2. **API Request**: Frontend sends POST request to `/api/v1/analyze-vessel`
+3. **ML Prediction**: Backend loads RandomForest model and predicts CO₂ emissions
+4. **ESG Scoring**: Deterministic algorithm calculates environmental score
+5. **Risk Analysis**: System identifies environmental risk flags
+6. **Response**: Results displayed with ESG gauge, KPI cards, recommendations, and alerts
 
 ## CORS Configuration
 
 CORS is configured to allow requests from:
 - `http://localhost:3000` (React dev server)
 - `http://localhost:3001`
-- All origins (`*`) for development
 
-**Production:** Update `CORS_ORIGINS` in [app/config.py](app/config.py) to restrict origins.
+**Production**: Update `CORS_ORIGINS` in [app/config.py](app/config.py) to restrict origins.
+
+## Testing
+
+Test the ML prediction endpoint:
+```bash
+curl -X POST http://localhost:8000/api/v1/analyze-vessel \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mmsi": "123456789",
+    "avg_speed": 12.5,
+    "speed_std": 2.3,
+    "total_distance_km": 450.0,
+    "time_at_sea_hours": 36.0,
+    "acceleration_events": 15,
+    "length": 180.0,
+    "width": 28.0,
+    "draft": 10.5,
+    "co2_factor": 3.2
+  }'
+```
+
+## Project Features Summary
+
+✅ **ML Pipeline**: RandomForest model for CO₂ emission predictions  
+✅ **ESG Scoring**: Deterministic environmental scoring with risk flags  
+✅ **Modern UI**: Glass-morphism design with maritime backgrounds  
+✅ **Real-time Analysis**: Instant vessel analysis with comprehensive results  
+✅ **RESTful API**: FastAPI backend with ML integration  
+✅ **Responsive Design**: Mobile-friendly Tailwind CSS styling  
+✅ **No Authentication**: Instant access without sign-up
 
 ## Error Handling
 
@@ -224,60 +342,102 @@ Example error response:
 
 ## Development
 
-### Code Style
-- Follow PEP 8 guidelines
-- Use type hints
-- Document all functions with docstrings
+### Adding New Features
 
-### Adding New Endpoints
+**Backend (FastAPI)**:
+1. Add route in [app/api/routes.py](app/api/routes.py)
+2. Create Pydantic schema in [app/models/schemas.py](app/models/schemas.py)
+3. Add business logic in [app/services/](app/services/)
 
-1. Add route function in [app/api/routes.py](app/api/routes.py)
-2. Create Pydantic model in [app/models/schemas.py](app/models/schemas.py) if needed
-3. Add business logic in [app/services/s3_service.py](app/services/s3_service.py) if needed
+**Frontend (React)**:
+1. Create component in [frontend/src/components/](frontend/src/components/)
+2. Add page in [frontend/src/pages/](frontend/src/pages/)
+3. Update routing in [frontend/src/App.jsx](frontend/src/App.jsx)
+4. Add API call in [frontend/src/services/api.js](frontend/src/services/api.js)
 
-## Deployment Options
+### Code Standards
+- **Python**: PEP 8, type hints, docstrings
+- **JavaScript**: ES6+, functional components, hooks
+- **Styling**: Tailwind utility classes, glass-morphism patterns
 
-### AWS Lambda
-- Package the application with dependencies
-- Configure Lambda to use IAM role for S3 access
-- Use AWS API Gateway as trigger
+## Deployment
 
-### Docker
+### Frontend (Static Hosting)
+- Build: `npm run build` in frontend directory
+- Deploy to: Vercel, Netlify, AWS S3 + CloudFront
+- Environment: Set API base URL for production
+
+### Backend (FastAPI)
+- **AWS Lambda**: Package with dependencies, use API Gateway
+- **Docker**: Build container and deploy to ECS/EKS
+- **EC2**: Run with systemd/supervisor, nginx reverse proxy
+
+Example Dockerfile:
 ```dockerfile
 FROM python:3.9-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY app ./app
+COPY ml ./ml
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### EC2 / ECS
-- Install dependencies on instance
-- Use systemd or supervisor to manage the process
-- Configure nginx as reverse proxy
+## Troubleshooting
+
+### Backend Issues
+
+**ML Model Not Found**  
+Ensure the trained model exists in the `ml/` directory with correct path in code.
+
+**CORS Errors**  
+Check that frontend URL is in `CORS_ORIGINS` in [app/config.py](app/config.py).
+
+**Import Errors**  
+Verify all dependencies are installed: `pip install -r requirements.txt`
+
+### Frontend Issues
+
+**API Connection Failed**  
+Verify backend is running at `http://localhost:8000` and check browser console for errors.
+
+**Blank Page**  
+Check browser console for errors, ensure all dependencies installed: `npm install`
+
+**Styling Issues**  
+Clear browser cache, verify Tailwind config in [frontend/tailwind.config.js](frontend/tailwind.config.js)
 
 ## Future Enhancements
 
-- [ ] Add caching layer (Redis) for frequently accessed data
-- [ ] Implement pagination for history endpoint
-- [ ] Add filtering and query parameters
-- [ ] Integrate ML model predictions
-- [ ] Add authentication (JWT tokens)
-- [ ] Implement rate limiting
-- [ ] Add comprehensive test suite
-- [ ] Set up CI/CD pipeline
+- [ ] Real-time vessel tracking with live AIS data feeds
+- [ ] Historical trend analysis and comparison charts
+- [ ] Fleet-wide analytics and benchmarking
+- [ ] PDF report generation with ESG metrics
+- [ ] Authentication and user accounts
+- [ ] Rate limiting and API keys
+- [ ] Comprehensive test suite (unit, integration, E2E)
+- [ ] CI/CD pipeline with GitHub Actions
+- [ ] Database integration for storing analysis history
+- [ ] Advanced ML models (Neural Networks, ensemble methods)
 
-## Troubleshooting
+## Tech Stack Details
 
-### Issue: AWS credentials not found
-**Solution:** Configure AWS credentials using `aws configure` or set environment variables.
+**Backend Dependencies**:
+- fastapi
+- uvicorn
+- boto3 (AWS S3)
+- scikit-learn
+- pandas
+- numpy
+- pydantic
 
-### Issue: S3 bucket access denied
-**Solution:** Ensure your IAM user/role has `s3:GetObject` and `s3:ListBucket` permissions for the bucket.
-
-### Issue: No data returned for MMSI
-**Solution:** Verify that processed files exist in `s3://ai-carbon-esg-data-prajwal/processed/features/` and contain the queried MMSI.
+**Frontend Dependencies**:
+- react
+- react-router-dom
+- axios
+- tailwindcss
+- autoprefixer
+- postcss
 
 ## License
 
