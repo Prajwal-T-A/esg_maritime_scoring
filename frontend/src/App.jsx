@@ -2,23 +2,30 @@
  * Main App Component
  * Entry point for the React application
  * 
- * Sets up React Router for navigation
- * Currently has only Home page, but router is ready for additional pages
+ * Routes:
+ * - / : Landing page with project introduction
+ * - /analyze : Vessel analysis page with ML + ESG scoring
+ * - /legacy : Original Home page (kept for reference)
  */
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Landing from './pages/Landing.jsx';
+import AnalyzeVessel from './pages/AnalyzeVessel.jsx';
 import Home from './pages/Home.jsx';
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Home Page - Main route */}
-        <Route path="/" element={<Home />} />
+        {/* Landing Page - New main route */}
+        <Route path="/" element={<Landing />} />
         
-        {/* Future routes can be added here */}
-        {/* Example: <Route path="/about" element={<About />} /> */}
+        {/* Analyze Vessel Page */}
+        <Route path="/analyze" element={<AnalyzeVessel />} />
+        
+        {/* Legacy Home Page - kept for reference */}
+        <Route path="/legacy" element={<Home />} />
       </Routes>
     </Router>
   );

@@ -76,6 +76,9 @@ ml/models/*.h5
 !ml/data/raw/.gitkeep
 !ml/models/.gitkeep
 
+# Test Files
+Test_Files/
+
 # Distribution / packaging
 pip-log.txt
 pip-delete-this-directory.txt

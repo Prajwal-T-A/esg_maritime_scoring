@@ -96,6 +96,23 @@ const apiService = {
       };
     }
   },
+
+  /**
+   * Analyze vessel with ML prediction and ESG scoring
+   * @param {Object} vesselData - Complete vessel operational data
+   * @returns {Promise} Analysis results with CO2, ESG score, rating, recommendations, and risk flags
+   */
+  analyzeVessel: async (vesselData) => {
+    try {
+      const response = await apiClient.post('/analyze-vessel', vesselData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to analyze vessel data',
+      };
+    }
+  },
 };
 
 export default apiService;

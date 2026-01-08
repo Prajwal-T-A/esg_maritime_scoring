@@ -11,9 +11,14 @@ from app.models.schemas import (
     AISRecord,
     ESGResponse,
     HealthResponse,
-    ErrorResponse
+    ErrorResponse,
+    EmissionPredictionRequest,
+    EmissionPredictionResponse,
+    VesselAnalysisResponse
 )
 from app.services.s3_service import s3_service
+from app.services.ml_service import predict_emissions
+from app.services.analysis_service import analyze_vessel
 
 # Create API router
 router = APIRouter()
@@ -178,4 +183,186 @@ async def get_vessel_esg_metrics(mmsi: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching ESG data: {str(e)}"
+        )
+
+
+@router.post(
+    "/predict-emissions",
+    response_model=EmissionPredictionResponse,
+    summary="Predict CO₂ Emissions",
+    description="Predict baseline CO₂ emissions for a vessel using the trained ML model",
+    responses={
+        200: {"description": "Successfully predicted CO₂ emissions"},
+        400: {"model": ErrorResponse, "description": "Invalid input data"},
+        500: {"model": ErrorResponse, "description": "Internal server error or model failure"}
+    },
+    tags=["ML Predictions"]
+)
+async def predict_vessel_emissions(request: EmissionPredictionRequest):
+    """
+    Predict CO₂ emissions for a vessel using the trained RandomForest model.
+    
+    This endpoint takes vessel operational features and returns an estimated
+    baseline CO₂ emission value in kilograms. The prediction is based on a
+    trained machine learning model using historical AIS data.
+    
+    The model uses the following features (in order):
+    1. avg_speed - Average speed over ground (knots)
+    2. speed_std - Standard deviation of speed (knots)
+    3. total_distance_km - Total distance traveled (km)
+    4. time_at_sea_hours - Total operational time (hours)
+    5. acceleration_events - Count of significant speed changes
+    6. length - Vessel length (meters)
+    7. width - Vessel width (meters)
+    8. draft - Vessel draft (meters)
+    9. co2_factor - CO₂ emission factor (kg CO₂ per fuel unit)
+    
+    Args:
+        request: EmissionPredictionRequest containing all required features
+        
+    Returns:
+        EmissionPredictionResponse with MMSI and predicted CO₂ emissions
+        
+    Raises:
+        HTTPException: 400 if input validation fails
+        HTTPException: 500 if model prediction fails
+        
+    Example:
+        Request:
+        ```json
+        {
+            "mmsi": "367123456",
+            "avg_speed": 12.5,
+            "speed_std": 2.1,
+            "total_distance_km": 150.0,
+            "time_at_sea_hours": 48.0,
+            "acceleration_events": 5,
+            "length": 200.0,
+            "width": 30.0,
+            "draft": 10.0,
+            "co2_factor": 3.206
+        }
+        ```
+        
+        Response:
+        ```json
+        {
+            "mmsi": "367123456",
+            "estimated_co2_kg": 5432.18
+        }
+        ```
+    """
+    try:
+        # Convert request to dictionary for ML service
+        # This keeps the ML service decoupled from Pydantic models
+        features = {
+            'avg_speed': request.avg_speed,
+            'speed_std': request.speed_std,
+            'total_distance_km': request.total_distance_km,
+            'time_at_sea_hours': request.time_at_sea_hours,
+            'acceleration_events': request.acceleration_events,
+            'length': request.length,
+            'width': request.width,
+            'draft': request.draft,
+            'co2_factor': request.co2_factor
+        }
+        
+        # Call ML service to get prediction
+        # This is a synchronous call - the model is fast enough for REST API
+        estimated_co2 = predict_emissions(features)
+        
+        # Return response with MMSI and prediction
+        return EmissionPredictionResponse(
+            mmsi=request.mmsi,
+            estimated_co2_kg=estimated_co2
+        )
+    
+    except ValueError as e:
+        # Input validation errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid input data: {str(e)}"
+        )
+    except RuntimeError as e:
+        # Model prediction errors
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {str(e)}"
+        )
+    except Exception as e:
+        # Unexpected errors
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@router.post(
+    "/analyze-vessel",
+    response_model=VesselAnalysisResponse,
+    summary="Unified Vessel Analysis",
+    description="Predict CO₂ emissions and compute ESG environmental score in one call",
+    responses={
+        200: {"description": "Successfully completed vessel analysis"},
+        400: {"model": ErrorResponse, "description": "Invalid input data"},
+        500: {"model": ErrorResponse, "description": "Analysis failed"}
+    }
+)
+async def analyze_vessel_endpoint(request: EmissionPredictionRequest):
+    """
+    Unified analysis combining ML emission prediction and ESG scoring.
+    
+    This endpoint provides a complete environmental analysis by:
+    1. Predicting CO₂ emissions using the ML model
+    2. Computing ESG environmental score based on operational metrics
+    3. Providing rating, interpretation, and actionable recommendations
+    
+    Args:
+        request: EmissionPredictionRequest with all vessel operational features
+        
+    Returns:
+        VesselAnalysisResponse containing:
+        - mmsi: Vessel identifier
+        - estimated_co2_kg: ML-predicted emissions
+        - esg_score: Environmental score (0-100)
+        - rating: Performance category
+        - description: Score interpretation
+        - recommendation: Improvement suggestions
+        - risk_flags: Identified environmental concerns
+        
+    Raises:
+        HTTPException: 400 if input validation fails
+        HTTPException: 500 if analysis fails
+    """
+    try:
+        # Call unified analysis service
+        result = analyze_vessel(
+            mmsi=request.mmsi,
+            avg_speed=request.avg_speed,
+            speed_std=request.speed_std,
+            total_distance_km=request.total_distance_km,
+            time_at_sea_hours=request.time_at_sea_hours,
+            acceleration_events=request.acceleration_events,
+            length=request.length,
+            width=request.width,
+            draft=request.draft,
+            co2_factor=request.co2_factor
+        )
+        
+        return VesselAnalysisResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid input data: {str(e)}"
+        )
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analysis failed: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error: {str(e)}"
         )
