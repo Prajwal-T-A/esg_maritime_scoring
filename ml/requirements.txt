@@ -1,0 +1,11 @@
+# ML Pipeline Requirements
+# Maritime Carbon Emission Estimation Pipeline
+
+# Core ML and Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# Optional: Enhanced functionality
+# matplotlib>=3.7.0  # For visualization (future enhancement)
+# seaborn>=0.12.0    # For statistical plots (future enhancement)

@@ -54,6 +54,28 @@ htmlcov/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# ML Pipeline - Generated Files
+# Exclude processed and feature data (can be regenerated)
+ml/data/processed/
+ml/data/features/
+
+# ML Pipeline - Raw Data Files (too large for GitHub)
+# These should be downloaded separately or stored in cloud storage
+ml/data/raw/*.csv
+ml/data/raw/*.parquet
+ml/data/raw/*.json
+
+# ML Models (large binary files - regenerate or use LFS)
+ml/models/*.pkl
+ml/models/*.joblib
+ml/models/*.h5
+
+# Keep directory structure but ignore contents
+!ml/data/processed/.gitkeep
+!ml/data/features/.gitkeep
+!ml/data/raw/.gitkeep
+!ml/models/.gitkeep
+
 # Distribution / packaging
 pip-log.txt
 pip-delete-this-directory.txt
