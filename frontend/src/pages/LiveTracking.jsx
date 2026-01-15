@@ -4,7 +4,9 @@ import LiveMap from '../components/LiveMap';
 
 const sectors = {
     Singapore: { center: [1.290270, 103.851959], zoom: 10 },
-    India: { center: [18.9667, 72.8333], zoom: 9 } // Mumbai center
+    India: { center: [18.9667, 72.8333], zoom: 9 }, // Mumbai center
+    Visakhapatnam: { center: [17.7, 83.3], zoom: 11 }, // Visakhapatnam Port
+    Mangalore: { center: [12.9, 74.8], zoom: 11 } // New Mangalore Port
 };
 
 const LiveTracking = () => {
@@ -80,6 +82,8 @@ const LiveTracking = () => {
                             >
                                 <option value="Singapore">Sector: Singapore Strait</option>
                                 <option value="India">Sector: Indian Coast (Mumbai)</option>
+                                <option value="Visakhapatnam">Sector: Visakhapatnam Port</option>
+                                <option value="Mangalore">Sector: Mangalore Port</option>
                             </select>
                             <p className="text-slate-400 text-xs text-slate-500">
                                 • Real-time ESG monitoring

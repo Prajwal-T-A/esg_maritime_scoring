@@ -21,7 +21,9 @@ class LiveTrackingService:
         # Format: [[Lon, Lat], [Lon, Lat]]
         self.sectors = {
             "Singapore": [[[103.5, 1.1], [104.1, 1.5]]],
-            "India": [[[72.5, 18.8], [73.0, 19.2]]] # Mumbai / JNPT approaches
+            "India": [[[72.5, 18.8], [73.0, 19.2]]], # Mumbai / JNPT approaches
+            "Visakhapatnam": [[[83.2, 17.6], [83.4, 17.8]]], # Visakhapatnam Port
+            "Mangalore": [[[74.7, 12.8], [74.9, 13.0]]] # New Mangalore Port
         }
         # Combine all sectors for the subscription
         self.bounding_box = [box[0] for box in self.sectors.values()]
@@ -147,20 +149,24 @@ class LiveTrackingService:
                         lat = report["Latitude"]
                         lon = report["Longitude"]
                         speed = report.get("Sog", 0.0)
+                        heading = report.get("Cog", 0.0)
                         
                         # USE SHARED ANALYSIS SERVICE
                         esg = await self._calculate_projected_analysis(mmsi, speed)
                         
                         # Determine rough sector for display context if needed
                         sector = "Unknown"
-                        if 100 < lon < 105: sector = "Singapore"
-                        elif 70 < lon < 80: sector = "India"
+                        if 103.5 <= lon <= 104.1 and 1.1 <= lat <= 1.5: sector = "Singapore"
+                        elif 72.5 <= lon <= 73.0 and 18.8 <= lat <= 19.2: sector = "India"
+                        elif 83.2 <= lon <= 83.4 and 17.6 <= lat <= 17.8: sector = "Visakhapatnam"
+                        elif 74.7 <= lon <= 74.9 and 12.8 <= lat <= 13.0: sector = "Mangalore"
 
                         processed_msg = {
                             "mmsi": mmsi,
                             "lat": lat,
                             "lon": lon,
                             "speed": speed,
+                            "heading": heading,
                             "timestamp": datetime.now(timezone.utc).isoformat(),
                             "esg_score": esg["score"],
                             "esg_color": esg["color"],
@@ -202,6 +208,30 @@ class LiveTrackingService:
                 "name": f"IND Sagar {i+1}",
                 "sector": "India"
             })
+        
+        # Visakhapatnam Vessels (MMSI prefix 419) - East Coast
+        for i in range(3):
+            vessels.append({
+                "mmsi": f"419{i+100:03d}",
+                "lat": 17.7 + (random.random() - 0.5) * 0.05,
+                "lon": 83.3 + (random.random() - 0.5) * 0.05,
+                "speed": 7.0 + random.random() * 9.0,
+                "course": random.random() * 360,
+                "name": f"Vizag Express {i+1}",
+                "sector": "Visakhapatnam"
+            })
+        
+        # Mangalore Vessels (MMSI prefix 419) - West Coast
+        for i in range(3):
+            vessels.append({
+                "mmsi": f"419{i+200:03d}",
+                "lat": 12.9 + (random.random() - 0.5) * 0.05,
+                "lon": 74.8 + (random.random() - 0.5) * 0.05,
+                "speed": 6.0 + random.random() * 10.0,
+                "course": random.random() * 360,
+                "name": f"Mangalore Cargo {i+1}",
+                "sector": "Mangalore"
+            })
             
         while self.is_running:
             for v in vessels:
@@ -221,6 +251,16 @@ class LiveTrackingService:
                     if v["lat"] > 19.3: v["lat"] = 18.5
                     if v["lat"] < 18.5: v["lat"] = 19.2
                     if v["lon"] > 73.1: v["lon"] = 72.5
+                elif v["sector"] == "Visakhapatnam":
+                    if v["lat"] > 17.8: v["lat"] = 17.6
+                    if v["lat"] < 17.6: v["lat"] = 17.8
+                    if v["lon"] > 83.4: v["lon"] = 83.2
+                    if v["lon"] < 83.2: v["lon"] = 83.4
+                elif v["sector"] == "Mangalore":
+                    if v["lat"] > 13.0: v["lat"] = 12.8
+                    if v["lat"] < 12.8: v["lat"] = 13.0
+                    if v["lon"] > 74.9: v["lon"] = 74.7
+                    if v["lon"] < 74.7: v["lon"] = 74.9
                 
                 v["speed"] = max(0, min(25, v["speed"] + (random.random() - 0.5)))
                 
@@ -236,6 +276,7 @@ class LiveTrackingService:
                     "lat": v["lat"],
                     "lon": v["lon"],
                     "speed": round(v["speed"], 1),
+                    "heading": round(v["course"], 1),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "esg_score": esg["score"],
                     "esg_color": esg["color"],
