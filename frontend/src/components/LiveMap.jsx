@@ -59,19 +59,34 @@ const LiveMap = ({ vessels, center = [1.290270, 103.851959], zoom = 10 }) => {
                         icon={createBadgeIcon(vessel.esg_color === 'green' ? '#4ade80' : vessel.esg_color === 'red' ? '#ef4444' : vessel.esg_color === 'orange' ? '#f97316' : '#eab308')}
                     >
                         <Popup className="glass-popup">
-                            <div className="p-2 min-w-[200px]">
-                                <h3 className="font-bold text-gray-800">{vessel.vessel_name}</h3>
-                                <div className="text-sm text-gray-600 mt-1">
-                                    <p>MMSI: {vessel.mmsi}</p>
-                                    <p>Speed: {vessel.speed.toFixed(1)} kts</p>
-                                    <p>ESG Score: <span className={`font-bold ${vessel.esg_score >= 90 ? 'text-green-600' :
+                            <div className="p-2 min-w-[250px]">
+                                <h3 className="font-bold text-gray-800 mb-2">{vessel.vessel_name}</h3>
+                                <div className="text-sm text-gray-600 space-y-1">
+                                    <p><span className="font-semibold">MMSI:</span> {vessel.mmsi}</p>
+                                    <p><span className="font-semibold">Speed:</span> {vessel.speed.toFixed(1)} kts</p>
+                                    <p><span className="font-semibold">ESG Score:</span> <span className={`font-bold ${vessel.esg_score >= 90 ? 'text-green-600' :
                                         vessel.esg_score >= 70 ? 'text-blue-600' :
                                             vessel.esg_score >= 50 ? 'text-yellow-600' : 'text-red-600'
                                         }`}>{vessel.esg_score}</span></p>
+                                    
+                                    {vessel.weather && vessel.weather.wind_speed_ms !== undefined && (
+                                        <div className="mt-2 pt-2 border-t border-gray-300">
+                                            <p className="font-semibold text-gray-700 mb-1">Weather Conditions:</p>
+                                            <p className="text-xs">💨 Wind: {vessel.weather.wind_speed_ms.toFixed(1)} m/s</p>
+                                            <p className="text-xs">🌊 Waves: {vessel.weather.wave_height_m.toFixed(1)} m</p>
+                                            <p className="text-xs">🌡️ Temp: {vessel.weather.temperature_c?.toFixed(1) || 'N/A'}°C</p>
+                                            <p className="text-xs">☁️ {vessel.weather.weather_condition || 'N/A'}</p>
+                                            {vessel.delta_weather !== undefined && vessel.delta_weather > 0 && (
+                                                <p className="text-xs font-semibold text-orange-600 mt-1">
+                                                    +{vessel.delta_weather.toFixed(0)} kg CO₂ (weather impact)
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 {vessel.risk_flags && vessel.risk_flags.length > 0 && (
                                     <div className="mt-2 text-xs bg-red-50 text-red-700 p-1 rounded">
-                                        {vessel.risk_flags.join(', ')}
+                                        ⚠️ {vessel.risk_flags.join(', ')}
                                     </div>
                                 )}
                             </div>

@@ -36,13 +36,13 @@ CO2_INTENSITY_THRESHOLD = 50.0  # kg CO₂/km
 # Policy reasoning: Frequent speed changes indicate inefficient operations,
 # leading to higher fuel consumption and emissions. Smooth operations are
 # preferred for both environmental and safety reasons.
-ACCELERATION_EVENTS_THRESHOLD = 20  # count
+ACCELERATION_EVENTS_THRESHOLD = 15  # count
 
 # Average Speed Limit (knots)
 # Policy reasoning: Excessive speed increases fuel consumption exponentially
 # (fuel consumption ∝ speed³). Optimal cruising speed balances efficiency
 # and operational requirements.
-AVG_SPEED_LIMIT = 18.0  # knots
+AVG_SPEED_LIMIT = 10.0  # knots
 
 # Long Duration Threshold (hours)
 # Policy reasoning: Extended continuous operations without port stops may
