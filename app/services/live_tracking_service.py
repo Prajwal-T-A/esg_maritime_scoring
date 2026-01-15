@@ -117,12 +117,10 @@ class LiveTrackingService:
         return {"score": score, "color": color, "risk_flags": ["Model Unavailable"]}
 
     async def stream_ais_data(self):
-        """
-        Stream data from AISStream.io or fallback to simulation.
-        This runs as a background task.
-        """
+        """Standard streaming with control message handling."""
         self.is_running = True
         
+        # If no API key, start simulation directly
         if not self.api_key:
             logger.warning("No AISSTREAM_API_KEY found. Starting simulation mode.")
             await self._run_simulation()
@@ -181,80 +179,26 @@ class LiveTrackingService:
                     logger.error(f"Error processing AIS message: {e}")
                     await asyncio.sleep(1)
 
-    async def _run_simulation(self):
-        """Generate fake vessel movements for demo purposes."""
-        vessels = []
-        
-        # Singapore Vessels (MMSI prefix 563)
-        for i in range(5):
-            vessels.append({
-                "mmsi": f"563{i:03d}",
-                "lat": 1.25 + (random.random() - 0.5) * 0.1,
-                "lon": 103.8 + (random.random() - 0.5) * 0.2,
-                "speed": 10.0 + random.random() * 10.0,
-                "course": random.random() * 360,
-                "name": f"SG Lion {i+1}",
-                "sector": "Singapore"
-            })
+    async def handle_client_message(self, message: str):
+        """Process control messages from frontend."""
+        try:
+            data = json.loads(message)
+            if data.get('type') == 'UPDATE_COUNT':
+                new_count = int(data.get('count', 5))
+                self.simulation_count = new_count
+                logger.info(f"Updated simulation vessel count to {new_count} per port")
+                # Restart simulation with new count if already running in sim mode
+                if self.is_simulation_active:
+                     self.should_restart_simulation = True
+        except Exception as e:
+            logger.error(f"Error handling client message: {e}")
 
-        # Indian Vessels (MMSI prefix 419) - Mumbai area
-        for i in range(5):
-            vessels.append({
-                "mmsi": f"419{i:03d}",
-                "lat": 18.9 + (random.random() - 0.5) * 0.1, # Approx Mumbai
-                "lon": 72.8 + (random.random() - 0.5) * 0.1,
-                "speed": 8.0 + random.random() * 8.0,
-                "course": random.random() * 360,
-                "name": f"IND Sagar {i+1}",
-                "sector": "India"
-            })
+    async def _run_simulation(self):
+        """Generate fake vessel movements."""
+        self.is_simulation_active = True
+        self.simulation_count = getattr(self, 'simulation_count', 5) # Default to 5
         
-        # Visakhapatnam Vessels (MMSI prefix 419) - East Coast
-        for i in range(3):
-            vessels.append({
-                "mmsi": f"419{i+100:03d}",
-                "lat": 17.7 + (random.random() - 0.5) * 0.05,
-                "lon": 83.3 + (random.random() - 0.5) * 0.05,
-                "speed": 7.0 + random.random() * 9.0,
-                "course": random.random() * 360,
-                "name": f"Vizag Express {i+1}",
-                "sector": "Visakhapatnam"
-            })
-        
-        # Mangalore Vessels (MMSI prefix 419) - West Coast
-        for i in range(3):
-            vessels.append({
-                "mmsi": f"419{i+200:03d}",
-                "lat": 12.9 + (random.random() - 0.5) * 0.05,
-                "lon": 74.8 + (random.random() - 0.5) * 0.05,
-                "speed": 6.0 + random.random() * 10.0,
-                "course": random.random() * 360,
-                "name": f"Mangalore Cargo {i+1}",
-                "sector": "Mangalore"
-            })
-            
         while self.is_running:
-            for v in vessels:
-                # Update position based on speed/course (simplified)
-                direction_lat = 1 if v["course"] < 180 else -1
-                direction_lon = 1 if 90 < v["course"] < 270 else -1
-                
-                v["lat"] += (random.random() * 0.001) * direction_lat
-                v["lon"] += (random.random() * 0.001) * direction_lon
-                
-                # Keep them somewhat bounded
-                if v["sector"] == "Singapore":
-                    if v["lat"] > 1.5: v["lat"] = 1.1
-                    if v["lon"] > 104.2: v["lon"] = 103.5
-                elif v["sector"] == "India":
-                    # Mumbai bounds
-                    if v["lat"] > 19.3: v["lat"] = 18.5
-                    if v["lat"] < 18.5: v["lat"] = 19.2
-                    if v["lon"] > 73.1: v["lon"] = 72.5
-                elif v["sector"] == "Visakhapatnam":
-                    if v["lat"] > 17.8: v["lat"] = 17.6
-                    if v["lat"] < 17.6: v["lat"] = 17.8
-                    if v["lon"] > 83.4: v["lon"] = 83.2
                     if v["lon"] < 83.2: v["lon"] = 83.4
                 elif v["sector"] == "Mangalore":
                     if v["lat"] > 13.0: v["lat"] = 12.8

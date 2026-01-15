@@ -458,9 +458,9 @@ async def websocket_endpoint(websocket: WebSocket):
              asyncio.create_task(live_tracking_service.stream_ais_data())
              
         while True:
-            # Keep connection alive and listen for any client messages (optional)
-            # For now we just discard client messages
-            await websocket.receive_text()
+            # Keep connection alive and listen for any client messages
+            message = await websocket.receive_text()
+            await live_tracking_service.handle_client_message(message)
             
     except WebSocketDisconnect:
         live_tracking_service.disconnect_client(websocket)

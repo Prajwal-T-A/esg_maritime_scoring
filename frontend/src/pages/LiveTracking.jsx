@@ -91,6 +91,28 @@ const LiveTracking = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
+                        {/* Simulation Control */}
+                        <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg px-2 py-1 border border-white/10">
+                            <label className="text-xs text-slate-400">Ships/Port:</label>
+                            <select
+                                onChange={(e) => {
+                                    // Send control message to backend
+                                    const ws = new WebSocket(window.location.protocol === 'https:' ? 'wss:' : 'ws:' + '//localhost:8000/api/v1/ws/live-vessels');
+                                    ws.onopen = () => {
+                                        ws.send(JSON.stringify({ type: 'UPDATE_COUNT', count: parseInt(e.target.value) }));
+                                        ws.close();
+                                    };
+                                }}
+                                className="bg-transparent text-xs text-cyan-400 font-mono focus:outline-none"
+                                defaultValue="5"
+                            >
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+
                         <div className={`px-3 py-1 rounded-full text-xs font-mono border ${connectionStatus.includes('Connected') ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-red-500/20 border-red-500 text-red-300'
                             }`}>
                             ● {connectionStatus}
