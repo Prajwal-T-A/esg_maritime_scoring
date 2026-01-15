@@ -5,6 +5,9 @@ Contains AWS S3 settings and application configuration.
 
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings:
@@ -26,6 +29,9 @@ class Settings:
     # Ollama Configuration
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    
+    # Weather API Configuration
+    OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
     
     # API Configuration
     API_V1_PREFIX: str = "/api/v1"

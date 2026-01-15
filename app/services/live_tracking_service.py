@@ -8,7 +8,10 @@ import websockets
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from app.services.ml_service import predict_emissions
+from app.services.weather_service import fetch_weather
+from app.services.live_emission_service import compute_adjusted_emissions
 from app.config import settings
+from ml.esg.esg_scoring import compute_esg_score
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +108,123 @@ class LiveTrackingService:
             print(f"[LIVE-ERROR] Analysis failed: {e}")
             return self._calculate_instant_esg_fallback(speed)
 
+    async def _calculate_weather_enriched_analysis(
+        self,
+        mmsi: str,
+        speed: float,
+        lat: float,
+        lon: float
+    ) -> Dict:
+        """
+        Compute weather-enriched ESG analysis with adjusted emissions.
+        
+        Fetches real-time weather, computes weather-adjusted emissions,
+        and includes weather-specific risk flags.
+        
+        Parameters
+        ----------
+        mmsi : str
+            Maritime Mobile Service Identity
+        speed : float
+            Current speed in knots
+        lat : float
+            Current latitude
+        lon : float
+            Current longitude
+        
+        Returns
+        -------
+        dict
+            Complete weather-enriched analysis with emissions and ESG score
+        """
+        try:
+            # 1. Fetch weather for location
+            weather_data = await fetch_weather(lat, lon)
+            logger.info(f"Weather for {mmsi}: wind={weather_data['wind_speed_ms']}m/s, waves={weather_data.get('wave_height_m')}m")
+            
+            # 2. Project metrics for 24-hour "Day-in-the-Life"
+            duration_hours = 24.0
+            projected_distance = speed * 1.852 * duration_hours  # km
+            
+            # Default Panamax parameters
+            length = 225.0
+            width = 32.0
+            draft = 12.0
+            co2_factor = 3.114
+            
+            # 3. Compute weather-adjusted emissions
+            emission_result = compute_adjusted_emissions(
+                avg_speed=speed,
+                speed_std=0.5 + (random.random() * 0.5),
+                distance_km=projected_distance,
+                time_at_sea_hours=duration_hours,
+                acceleration_events=int(speed / 4),
+                length=length,
+                width=width,
+                draft=draft,
+                co2_factor=co2_factor,
+                weather_resistance_factor=weather_data['weather_resistance_factor']
+            )
+            
+            # 4. Compute ESG score using weather-adjusted CO2
+            esg_score, base_risk_flags = compute_esg_score(
+                baseline_co2=emission_result['adjusted_co2_kg'],
+                total_distance_km=projected_distance,
+                avg_speed=speed,
+                acceleration_events=int(speed / 4),
+                time_at_sea_hours=duration_hours
+            )
+            
+            # 5. Add weather-specific risk flags
+            risk_flags = list(base_risk_flags)
+            if weather_data['storm_flag']:
+                risk_flags.append("Storm navigation")
+            if weather_data['rough_sea_flag']:
+                risk_flags.append("High wave resistance")
+            if weather_data['wind_speed_ms'] > 12.0:
+                risk_flags.append("Strong wind conditions")
+            
+            # 6. Map ESG score to rating
+            if esg_score >= 90:
+                rating = "Excellent"
+            elif esg_score >= 70:
+                rating = "Good"
+            elif esg_score >= 50:
+                rating = "Moderate"
+            elif esg_score >= 30:
+                rating = "Poor"
+            else:
+                rating = "Critical"
+            
+            # 7. Map ESG score to color
+            if esg_score >= 90:
+                color = "green"
+            elif esg_score >= 70:
+                color = "blue"
+            elif esg_score >= 50:
+                color = "yellow"
+            elif esg_score >= 30:
+                color = "orange"
+            else:
+                color = "red"
+            
+            return {
+                'score': esg_score,
+                'rating': rating,
+                'color': color,
+                'risk_flags': risk_flags,
+                'weather': weather_data,
+                'emissions': emission_result,
+                'base_co2': emission_result['base_co2_kg'],
+                'adjusted_co2': emission_result['adjusted_co2_kg'],
+                'delta_weather': emission_result['delta_due_to_weather']
+            }
+        
+        except Exception as e:
+            logger.error(f"Weather-enriched analysis failed for {mmsi}: {str(e)}")
+            return self._calculate_instant_esg_fallback(speed)
+
+
     def _calculate_instant_esg_fallback(self, speed: float) -> dict:
         """Fallback simple scoring if ML service is unavailable."""
         score = 99 # Distinct value identifying fallback
@@ -117,7 +237,7 @@ class LiveTrackingService:
         return {"score": score, "color": color, "risk_flags": ["Model Unavailable"]}
 
     async def stream_ais_data(self):
-        """Standard streaming with control message handling."""
+        """Standard streaming with weather enrichment and control message handling."""
         self.is_running = True
         
         # If no API key, start simulation directly
@@ -149,8 +269,13 @@ class LiveTrackingService:
                         speed = report.get("Sog", 0.0)
                         heading = report.get("Cog", 0.0)
                         
-                        # USE SHARED ANALYSIS SERVICE
-                        esg = await self._calculate_projected_analysis(mmsi, speed)
+                        # USE WEATHER-ENRICHED ANALYSIS
+                        analysis = await self._calculate_weather_enriched_analysis(
+                            mmsi=mmsi,
+                            speed=speed,
+                            lat=lat,
+                            lon=lon
+                        )
                         
                         # Determine rough sector for display context if needed
                         sector = "Unknown"
@@ -166,11 +291,16 @@ class LiveTrackingService:
                             "speed": speed,
                             "heading": heading,
                             "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "esg_score": esg["score"],
-                            "esg_color": esg["color"],
+                            "esg_score": analysis["score"],
+                            "rating": analysis["rating"],
+                            "esg_color": analysis["color"],
                             "vessel_name": f"Vessel {mmsi[-4:]}",
                             "sector": sector,
-                            "risk_flags": esg["risk_flags"]
+                            "risk_flags": analysis["risk_flags"],
+                            "weather": analysis.get("weather", {}),
+                            "base_co2": analysis.get("base_co2"),
+                            "adjusted_co2": analysis.get("adjusted_co2"),
+                            "delta_weather": analysis.get("delta_weather")
                         }
                         
                         await self.broadcast_to_clients(processed_msg)
@@ -198,69 +328,108 @@ class LiveTrackingService:
         self.is_simulation_active = True
         self.simulation_count = getattr(self, 'simulation_count', 5) # Default to 5
         
+        # Initialize vessel positions ONCE per simulation session
+        # This ensures all vessels maintain consistent positions relative to each other
+        vessels = []
+        
+        # Generate vessels based on current count with FIXED positions
+        # Singapore Strait (offshore only - between Malaysia & Singapore)
+        for i in range(self.simulation_count):
+            vessels.append({
+                "mmsi": f"563{i:03d}",
+                "lat": 1.25 + (i % 3) * 0.03,        # Fixed position based on index
+                "lon": 103.60 + (i % 5) * 0.08,      # Fixed position based on index
+                "speed": 10.0 + (i % 7) * 1.5,       # Fixed speed based on index
+                "course": (i * 72) % 360,            # Fixed course based on index
+                "name": f"SG Lion {i+1}",
+                "sector": "Singapore"
+            })
+        
+        # India - Arabian Sea (offshore)
+        for i in range(self.simulation_count):
+            vessels.append({
+                "mmsi": f"419{i:03d}",
+                "lat": 18.90 + (i % 3) * 0.08,       # Fixed position
+                "lon": 72.65 + (i % 5) * 0.10,       # Fixed position
+                "speed": 8.0 + (i % 6) * 1.2,        # Fixed speed
+                "course": (i * 45) % 360,            # Fixed course
+                "name": f"IND Sagar {i+1}",
+                "sector": "India"
+            })
+        
+        # Visakhapatnam - Bay of Bengal (offshore)
+        for i in range(self.simulation_count):
+             vessels.append({
+                "mmsi": f"419{i+500:03d}",
+                "lat": 17.70 + (i % 3) * 0.08,       # Fixed position
+                "lon": 83.20 + (i % 5) * 0.08,       # Fixed position
+                "speed": 5.0 + (i % 5) * 0.8,        # Fixed speed
+                "course": (i * 60) % 360,            # Fixed course
+                "name": f"VSKP Port {i+1}",
+                "sector": "Visakhapatnam"
+            })
+        
+        # Mangalore - Arabian Sea (offshore)
+        for i in range(self.simulation_count):
+             vessels.append({
+                "mmsi": f"419{i+800:03d}",
+                "lat": 12.80 + (i % 3) * 0.07,       # Fixed position
+                "lon": 74.60 + (i % 5) * 0.10,       # Fixed position
+                "speed": 6.0 + (i % 5) * 1.0,        # Fixed speed
+                "course": (i * 50) % 360,            # Fixed course
+                "name": f"NMPT Port {i+1}",
+                "sector": "Mangalore"
+            })
+        
         while self.is_running:
             self.should_restart_simulation = False
-            vessels = []
             
-            # Generate vessels based on current count
-            # Singapore
-            for i in range(self.simulation_count):
-                vessels.append({
-                    "mmsi": f"563{i:03d}",
-                    "lat": 1.25 + (random.random() - 0.5) * 0.1,
-                    "lon": 103.8 + (random.random() - 0.5) * 0.2,
-                    "speed": 10.0 + random.random() * 10.0,
-                    "course": random.random() * 360,
-                    "name": f"SG Lion {i+1}",
-                    "sector": "Singapore"
-                })
-            # India
-            for i in range(self.simulation_count):
-                vessels.append({
-                    "mmsi": f"419{i:03d}",
-                    "lat": 18.9 + (random.random() - 0.5) * 0.1,
-                    "lon": 72.8 + (random.random() - 0.5) * 0.1,
-                    "speed": 8.0 + random.random() * 8.0,
-                    "course": random.random() * 360,
-                    "name": f"IND Sagar {i+1}",
-                    "sector": "India"
-                })
-            # Visakhapatnam
-            for i in range(self.simulation_count):
-                 vessels.append({
-                    "mmsi": f"419{i+500:03d}", # Distinct MMSI range
-                    "lat": 17.7 + (random.random() - 0.5) * 0.05,
-                    "lon": 83.3 + (random.random() - 0.5) * 0.05,
-                    "speed": 5.0 + random.random() * 5.0,
-                    "course": random.random() * 360,
-                    "name": f"VSKP Port {i+1}",
-                    "sector": "Visakhapatnam"
-                })
-            # Mangalore
-            for i in range(self.simulation_count):
-                 vessels.append({
-                    "mmsi": f"419{i+800:03d}",
-                    "lat": 12.9 + (random.random() - 0.5) * 0.05,
-                    "lon": 74.8 + (random.random() - 0.5) * 0.05,
-                    "speed": 6.0 + random.random() * 6.0,
-                    "course": random.random() * 360,
-                    "name": f"NMPT Port {i+1}",
-                    "sector": "Mangalore"
-                })
-
             while self.is_running and not self.should_restart_simulation:
                 for v in vessels:
-                    # Update physics
+                    # SMOOTH movement: small random walk around fixed position
+                    # Use vessel MMSI as seed for reproducible small variations
+                    mmsi_num = int(v["mmsi"])
+                    random.seed((mmsi_num + int(datetime.now(timezone.utc).timestamp())) // 30)  # Repeats every 30 sec
+                    
                     direction_lat = 1 if v["course"] < 180 else -1
                     direction_lon = 1 if 90 < v["course"] < 270 else -1
-                    v["lat"] += (random.random() * 0.001) * direction_lat
-                    v["lon"] += (random.random() * 0.001) * direction_lon
-                    v["speed"] = max(0, min(25, v["speed"] + (random.random() - 0.5)))
+                    
+                    # VERY SMALL movements to show motion but keep vessel localized
+                    v["lat"] += (random.random() * 0.0005) * direction_lat  # 50% smaller
+                    v["lon"] += (random.random() * 0.0005) * direction_lon  # 50% smaller
+                    v["speed"] = max(0, min(25, v["speed"] + (random.random() - 0.5) * 0.3))  # Smaller variation
+                    
+                    # Boundary constraints to keep vessels in water
+                    sector = v["sector"]
+                    if sector == "Singapore":
+                        v["lat"] = max(1.20, min(1.36, v["lat"]))  # Singapore Strait bounds
+                        v["lon"] = max(103.40, min(103.90, v["lon"]))
+                    elif sector == "India":
+                        v["lat"] = max(18.80, min(19.10, v["lat"]))  # Arabian Sea
+                        v["lon"] = max(72.50, min(72.90, v["lon"]))
+                    elif sector == "Visakhapatnam":
+                        v["lat"] = max(17.60, min(17.90, v["lat"]))  # Bay of Bengal
+                        v["lon"] = max(83.05, min(83.45, v["lon"]))
+                    elif sector == "Mangalore":
+                        v["lat"] = max(12.73, min(12.97, v["lat"]))  # Arabian Sea
+                        v["lon"] = max(74.45, min(74.85, v["lon"]))
+                    elif sector == "Visakhapatnam":
+                        v["lat"] = max(17.60, min(17.90, v["lat"]))  # Bay of Bengal
+                        v["lon"] = max(83.05, min(83.45, v["lon"]))
+                    elif sector == "Mangalore":
+                        v["lat"] = max(12.73, min(12.97, v["lat"]))  # Arabian Sea
+                        v["lon"] = max(74.45, min(74.85, v["lon"]))
                     
                     try:
-                        esg = await self._calculate_projected_analysis(v["mmsi"], v["speed"])
+                        # Use weather-enriched analysis
+                        analysis = await self._calculate_weather_enriched_analysis(
+                            mmsi=v["mmsi"],
+                            speed=v["speed"],
+                            lat=v["lat"],
+                            lon=v["lon"]
+                        )
                     except Exception:
-                        esg = self._calculate_instant_esg_fallback(v["speed"])
+                        analysis = self._calculate_instant_esg_fallback(v["speed"])
                     
                     msg = {
                         "mmsi": v["mmsi"],
@@ -269,11 +438,16 @@ class LiveTrackingService:
                         "speed": round(v["speed"], 1),
                         "heading": round(v["course"], 1),
                         "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "esg_score": esg["score"],
-                        "esg_color": esg["color"],
+                        "esg_score": analysis["score"],
+                        "rating": analysis.get("rating", "Unknown"),
+                        "esg_color": analysis["color"],
                         "vessel_name": v["name"],
                         "sector": v["sector"],
-                        "risk_flags": esg["risk_flags"],
+                        "risk_flags": analysis["risk_flags"],
+                        "weather": analysis.get("weather", {}),
+                        "base_co2": analysis.get("base_co2"),
+                        "adjusted_co2": analysis.get("adjusted_co2"),
+                        "delta_weather": analysis.get("delta_weather"),
                         "is_simulation": True
                     }
                     await self.broadcast_to_clients(msg)

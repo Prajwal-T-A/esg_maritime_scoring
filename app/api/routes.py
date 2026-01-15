@@ -17,7 +17,10 @@ from app.models.schemas import (
     VesselAnalysisResponse,
     ChatRequest,
     ChatResponse,
-    OllamaHealthResponse
+    OllamaHealthResponse,
+    WeatherData,
+    WeatherAdjustedEmissions,
+    LiveTrackingPayload
 )
 from app.services.s3_service import s3_service
 from app.services.ml_service import predict_emissions
@@ -443,13 +446,135 @@ async def check_ollama_health():
 # WebSocket endpoint for live tracking
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.live_tracking_service import live_tracking_service
+from app.services.weather_service import get_weather_service
+from app.services.live_emission_service import compute_adjusted_emissions
 import asyncio
+
+
+@router.get(
+    "/weather/{lat}/{lon}",
+    summary="Get Weather Data",
+    description="Fetch real-time weather for a location (lat/lon)",
+    responses={
+        200: {"description": "Weather data retrieved successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid coordinates"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_weather(lat: float, lon: float):
+    """
+    Fetch real-time weather data for a specific latitude/longitude.
+    
+    Weather data includes wind, waves, conditions, and computed
+    weather resistance factor for maritime operations.
+    
+    Args:
+        lat: Latitude coordinate
+        lon: Longitude coordinate
+    
+    Returns:
+        Weather data with resistance factors and flags
+    """
+    try:
+        if lat < -90 or lat > 90 or lon < -180 or lon > 180:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid coordinates: lat [-90,90], lon [-180,180]"
+            )
+        
+        weather_service = get_weather_service()
+        weather_data = await weather_service.fetch_weather(lat, lon)
+        
+        return {
+            "latitude": lat,
+            "longitude": lon,
+            "timestamp": weather_data.get('timestamp'),
+            "weather": weather_data
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Weather fetch error: {str(e)}"
+        )
+
+
+@router.post(
+    "/emissions/weather-adjusted",
+    summary="Compute Weather-Adjusted Emissions",
+    description="Compute baseline and weather-adjusted CO2 emissions",
+    responses={
+        200: {"description": "Emissions computed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid input"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def compute_weather_adjusted_emissions(request: EmissionPredictionRequest, weather_resistance_factor: float = 1.0):
+    """
+    Compute weather-adjusted CO2 emissions for a vessel.
+    
+    Takes baseline vessel parameters and a weather resistance factor,
+    returns both baseline and weather-adjusted emissions.
+    
+    Args:
+        request: Vessel operational parameters
+        weather_resistance_factor: Weather multiplier (≥1.0)
+    
+    Returns:
+        Base and weather-adjusted emissions with delta
+    """
+    try:
+        if weather_resistance_factor < 1.0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Weather resistance factor must be ≥ 1.0"
+            )
+        
+        result = compute_adjusted_emissions(
+            avg_speed=request.avg_speed,
+            speed_std=request.speed_std,
+            distance_km=request.total_distance_km,
+            time_at_sea_hours=request.time_at_sea_hours,
+            acceleration_events=request.acceleration_events,
+            length=request.length,
+            width=request.width,
+            draft=request.draft,
+            co2_factor=request.co2_factor,
+            weather_resistance_factor=weather_resistance_factor
+        )
+        
+        return {
+            "mmsi": request.mmsi,
+            "emissions": result,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Emissions calculation error: {str(e)}"
+        )
+
 
 @router.websocket("/ws/live-vessels")
 async def websocket_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for real-time vessel tracking.
-    Streams vessel positions and live ESG scores.
+    
+    Streams vessel positions, weather data, and weather-adjusted ESG scores
+    every 2 seconds. Payload includes:
+    - Real-time position and heading
+    - Weather conditions (wind, waves)
+    - Baseline and weather-adjusted CO2 emissions
+    - ESG score and rating
+    - Risk flags (including weather-specific)
+    
+    Use this endpoint to subscribe to live vessel tracking with
+    weather enrichment and ML-based ESG analysis.
     """
     await live_tracking_service.connect_client(websocket)
     try:

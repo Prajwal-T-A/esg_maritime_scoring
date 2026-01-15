@@ -220,3 +220,103 @@ class OllamaHealthResponse(BaseModel):
     models: Optional[list[str]] = Field(default=None, description="Available models")
     configured_model: str = Field(..., description="Configured model name")
     model_available: Optional[bool] = Field(default=None, description="Whether configured model is available")
+
+
+class WeatherData(BaseModel):
+    """Schema for weather information."""
+    
+    wind_speed_ms: float = Field(..., description="Wind speed in meters per second")
+    wind_direction_deg: int = Field(..., description="Wind direction in degrees (0-360)")
+    condition: str = Field(..., description="Weather condition (clear/rain/storm/clouds)")
+    wave_height_m: Optional[float] = Field(None, description="Wave height in meters")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    weather_resistance_factor: float = Field(..., description="Weather resistance multiplier (>=1.0)")
+    storm_flag: bool = Field(..., description="True if storm conditions detected")
+    rough_sea_flag: bool = Field(..., description="True if wave height > 3m")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "wind_speed_ms": 8.5,
+                "wind_direction_deg": 180,
+                "condition": "rain",
+                "wave_height_m": 2.5,
+                "timestamp": "2026-01-15T10:30:00Z",
+                "weather_resistance_factor": 1.12,
+                "storm_flag": False,
+                "rough_sea_flag": False
+            }
+        }
+
+
+class WeatherAdjustedEmissions(BaseModel):
+    """Schema for weather-adjusted emission calculations."""
+    
+    base_co2_kg: float = Field(..., description="Baseline CO2 emissions without weather adjustment")
+    adjusted_co2_kg: float = Field(..., description="Weather-adjusted CO2 emissions")
+    delta_due_to_weather: float = Field(..., description="Delta in emissions due to weather")
+    adjusted_speed_knots: float = Field(..., description="Speed adjusted by weather resistance factor")
+    weather_resistance_factor: float = Field(..., description="Applied weather resistance multiplier")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "base_co2_kg": 5000.0,
+                "adjusted_co2_kg": 5600.0,
+                "delta_due_to_weather": 600.0,
+                "adjusted_speed_knots": 13.2,
+                "weather_resistance_factor": 1.1
+            }
+        }
+
+
+class LiveTrackingPayload(BaseModel):
+    """Schema for live tracking WebSocket payload with weather integration."""
+    
+    mmsi: str = Field(..., description="Maritime Mobile Service Identity")
+    latitude: float = Field(..., description="Current latitude")
+    longitude: float = Field(..., description="Current longitude")
+    speed_knots: float = Field(..., description="Current speed in knots")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    
+    # Weather data
+    weather: WeatherData = Field(..., description="Real-time weather information")
+    
+    # Emissions (baseline and adjusted)
+    base_co2: float = Field(..., description="Baseline CO2 emissions")
+    adjusted_co2: float = Field(..., description="Weather-adjusted CO2 emissions")
+    delta_weather: float = Field(..., description="Delta due to weather")
+    
+    # ESG scoring
+    esg_score: int = Field(..., ge=0, le=100, description="Environmental ESG score")
+    rating: str = Field(..., description="ESG rating (Excellent/Good/Moderate/Poor/Critical)")
+    
+    # Risk flags (including weather-specific)
+    risk_flags: list[str] = Field(..., description="Environmental and weather-related risk indicators")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "mmsi": "123456789",
+                "latitude": 1.3521,
+                "longitude": 103.8198,
+                "speed_knots": 12.5,
+                "timestamp": "2026-01-15T10:30:00Z",
+                "weather": {
+                    "wind_speed_ms": 8.5,
+                    "wind_direction_deg": 180,
+                    "condition": "rain",
+                    "wave_height_m": 2.5,
+                    "timestamp": "2026-01-15T10:30:00Z",
+                    "weather_resistance_factor": 1.12,
+                    "storm_flag": False,
+                    "rough_sea_flag": False
+                },
+                "base_co2": 5000.0,
+                "adjusted_co2": 5600.0,
+                "delta_weather": 600.0,
+                "esg_score": 75,
+                "rating": "Good",
+                "risk_flags": ["High wave resistance", "Excessive speed"]
+            }
+        }
