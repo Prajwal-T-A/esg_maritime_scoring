@@ -19,7 +19,8 @@ async def analyze_vessel(
     width: float,
     draft: float,
     co2_factor: float,
-    include_ai_recommendation: bool = True
+    include_ai_recommendation: bool = True,
+    generate_report: bool = False
 ) -> Dict:
     """
     Unified analysis combining ML emission prediction and ESG scoring.
@@ -100,6 +101,19 @@ async def analyze_vessel(
             risk_flags=risk_flags
         )
     
+    # Step 5: Generate Detailed Report (Optional)
+    detailed_report = None
+    if generate_report:
+        detailed_report = await _generate_detailed_report(
+            mmsi=mmsi,
+            esg_score=esg_score,
+            rating=interpretation['rating'],
+            estimated_co2_kg=estimated_co2_kg,
+            total_distance_km=total_distance_km,
+            avg_speed=avg_speed,
+            risk_flags=risk_flags
+        )
+
     return {
         'mmsi': mmsi,
         'estimated_co2_kg': estimated_co2_kg,
@@ -107,8 +121,45 @@ async def analyze_vessel(
         'rating': interpretation['rating'],
         'description': interpretation['description'],
         'recommendation': recommendation,
+        'detailed_report': detailed_report,
         'risk_flags': risk_flags
     }
+
+
+async def _generate_detailed_report(
+    mmsi: str,
+    esg_score: int,
+    rating: str,
+    estimated_co2_kg: float,
+    total_distance_km: float,
+    avg_speed: float,
+    risk_flags: List[str]
+) -> str:
+    """Generate a comprehensive markdown report using Ollama."""
+    try:
+        co2_intensity = estimated_co2_kg / total_distance_km if total_distance_km > 0 else 0
+        prompt = f"""Generate a professional Environmental Impact Assessment Report in Markdown for Vessel {mmsi}.
+        
+Data:
+- ESG Score: {esg_score}/100 ({rating})
+- Total CO2 Emissions: {estimated_co2_kg:.2f} kg
+- Carbon Intensity: {co2_intensity:.2f} kg/km
+- Operating Speed: {avg_speed:.1f} knots
+- Active Risks: {', '.join(risk_flags) if risk_flags else 'None'}
+
+Required Structure:
+1. **Executive Summary**: Brief overview of the vessel's environmental performance.
+2. **Analysis of Key Metrics**: detailed breakdown of the emissions and intensity.
+3. **Risk Assessment**: Discussion of the flagged risks and their potential impact.
+4. **Regulatory Recommendations**: Suggestions for compliance (IMO, CII).
+5. **Action Plan**: 3 concrete steps to improve the score.
+
+Keep it professional, concise, and structured."""
+
+        result = await ollama_service.chat(prompt, None, use_system_prompt=False)
+        return result['message'] if result.get('success') else "Failed to generate report."
+    except Exception as e:
+        return f"Error generating report: {str(e)}"
 
 
 async def _generate_ai_recommendation(

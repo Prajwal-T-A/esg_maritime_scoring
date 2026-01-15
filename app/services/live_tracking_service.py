@@ -199,38 +199,85 @@ class LiveTrackingService:
         self.simulation_count = getattr(self, 'simulation_count', 5) # Default to 5
         
         while self.is_running:
-                    if v["lon"] < 83.2: v["lon"] = 83.4
-                elif v["sector"] == "Mangalore":
-                    if v["lat"] > 13.0: v["lat"] = 12.8
-                    if v["lat"] < 12.8: v["lat"] = 13.0
-                    if v["lon"] > 74.9: v["lon"] = 74.7
-                    if v["lon"] < 74.7: v["lon"] = 74.9
-                
-                v["speed"] = max(0, min(25, v["speed"] + (random.random() - 0.5)))
-                
-                # USE SHARED ANALYSIS SERVICE
-                try:
-                    esg = await self._calculate_projected_analysis(v["mmsi"], v["speed"])
-                except Exception as e:
-                    print(f"[SIM-ERROR] {e}")
-                    esg = self._calculate_instant_esg_fallback(v["speed"])
-                
-                msg = {
-                    "mmsi": v["mmsi"],
-                    "lat": v["lat"],
-                    "lon": v["lon"],
-                    "speed": round(v["speed"], 1),
-                    "heading": round(v["course"], 1),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "esg_score": esg["score"],
-                    "esg_color": esg["color"],
-                    "vessel_name": v["name"],
-                    "sector": v["sector"],
-                    "risk_flags": esg["risk_flags"],
-                    "is_simulation": True
-                }
-                await self.broadcast_to_clients(msg)
+            self.should_restart_simulation = False
+            vessels = []
             
-            await asyncio.sleep(2)  # Update every 2 seconds
+            # Generate vessels based on current count
+            # Singapore
+            for i in range(self.simulation_count):
+                vessels.append({
+                    "mmsi": f"563{i:03d}",
+                    "lat": 1.25 + (random.random() - 0.5) * 0.1,
+                    "lon": 103.8 + (random.random() - 0.5) * 0.2,
+                    "speed": 10.0 + random.random() * 10.0,
+                    "course": random.random() * 360,
+                    "name": f"SG Lion {i+1}",
+                    "sector": "Singapore"
+                })
+            # India
+            for i in range(self.simulation_count):
+                vessels.append({
+                    "mmsi": f"419{i:03d}",
+                    "lat": 18.9 + (random.random() - 0.5) * 0.1,
+                    "lon": 72.8 + (random.random() - 0.5) * 0.1,
+                    "speed": 8.0 + random.random() * 8.0,
+                    "course": random.random() * 360,
+                    "name": f"IND Sagar {i+1}",
+                    "sector": "India"
+                })
+            # Visakhapatnam
+            for i in range(self.simulation_count):
+                 vessels.append({
+                    "mmsi": f"419{i+500:03d}", # Distinct MMSI range
+                    "lat": 17.7 + (random.random() - 0.5) * 0.05,
+                    "lon": 83.3 + (random.random() - 0.5) * 0.05,
+                    "speed": 5.0 + random.random() * 5.0,
+                    "course": random.random() * 360,
+                    "name": f"VSKP Port {i+1}",
+                    "sector": "Visakhapatnam"
+                })
+            # Mangalore
+            for i in range(self.simulation_count):
+                 vessels.append({
+                    "mmsi": f"419{i+800:03d}",
+                    "lat": 12.9 + (random.random() - 0.5) * 0.05,
+                    "lon": 74.8 + (random.random() - 0.5) * 0.05,
+                    "speed": 6.0 + random.random() * 6.0,
+                    "course": random.random() * 360,
+                    "name": f"NMPT Port {i+1}",
+                    "sector": "Mangalore"
+                })
+
+            while self.is_running and not self.should_restart_simulation:
+                for v in vessels:
+                    # Update physics
+                    direction_lat = 1 if v["course"] < 180 else -1
+                    direction_lon = 1 if 90 < v["course"] < 270 else -1
+                    v["lat"] += (random.random() * 0.001) * direction_lat
+                    v["lon"] += (random.random() * 0.001) * direction_lon
+                    v["speed"] = max(0, min(25, v["speed"] + (random.random() - 0.5)))
+                    
+                    try:
+                        esg = await self._calculate_projected_analysis(v["mmsi"], v["speed"])
+                    except Exception:
+                        esg = self._calculate_instant_esg_fallback(v["speed"])
+                    
+                    msg = {
+                        "mmsi": v["mmsi"],
+                        "lat": v["lat"],
+                        "lon": v["lon"],
+                        "speed": round(v["speed"], 1),
+                        "heading": round(v["course"], 1),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "esg_score": esg["score"],
+                        "esg_color": esg["color"],
+                        "vessel_name": v["name"],
+                        "sector": v["sector"],
+                        "risk_flags": esg["risk_flags"],
+                        "is_simulation": True
+                    }
+                    await self.broadcast_to_clients(msg)
+                
+                await asyncio.sleep(2)
 
 live_tracking_service = LiveTrackingService()

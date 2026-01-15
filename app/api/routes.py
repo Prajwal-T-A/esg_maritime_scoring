@@ -350,7 +350,8 @@ async def analyze_vessel_endpoint(request: EmissionPredictionRequest):
             length=request.length,
             width=request.width,
             draft=request.draft,
-            co2_factor=request.co2_factor
+            co2_factor=request.co2_factor,
+            generate_report=request.generate_report
         )
         
         return VesselAnalysisResponse(**result)

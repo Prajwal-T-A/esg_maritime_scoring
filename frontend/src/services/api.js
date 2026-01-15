@@ -115,7 +115,8 @@ const apiService = {
    */
   analyzeVessel: async (vesselData) => {
     try {
-      const response = await apiClient.post('/analyze-vessel', vesselData);
+      // Use chatClient for longer timeout (60s) needed for AI report generation
+      const response = await chatClient.post('/analyze-vessel', vesselData);
       return { success: true, data: response.data };
     } catch (error) {
       return {

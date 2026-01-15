@@ -100,6 +100,7 @@ class EmissionPredictionRequest(BaseModel):
     width: float = Field(..., ge=0, le=100, description="Vessel width in meters")
     draft: float = Field(..., ge=0, le=50, description="Vessel draft in meters")
     co2_factor: float = Field(..., ge=0, le=10, description="CO₂ emission factor (kg CO₂ per fuel unit)")
+    generate_report: bool = Field(False, description="Whether to generate a detailed AI report")
     
     class Config:
         json_schema_extra = {
@@ -150,6 +151,7 @@ class VesselAnalysisResponse(BaseModel):
     rating: str = Field(..., description="ESG performance rating (Excellent/Good/Moderate/Poor/Critical)")
     description: str = Field(..., description="Human-readable score interpretation")
     recommendation: str = Field(..., description="Actionable improvement recommendations")
+    detailed_report: Optional[str] = Field(None, description="Detailed AI-generated analysis report")
     risk_flags: list[str] = Field(..., description="List of environmental risk indicators")
     
     class Config:
