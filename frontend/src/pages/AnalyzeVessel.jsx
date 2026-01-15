@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/api';
 import maritimeBackground from '../images/maritime-operations-data-analysis.avif';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 function AnalyzeVessel() {
   const navigate = useNavigate();
@@ -50,19 +51,46 @@ function AnalyzeVessel() {
     setError(null);
     setResult(null);
 
+    // Validate all fields are filled
+    const requiredFields = ['mmsi', 'avg_speed', 'speed_std', 'total_distance_km', 
+                           'time_at_sea_hours', 'acceleration_events', 'length', 
+                           'width', 'draft', 'co2_factor'];
+    
+    for (const field of requiredFields) {
+      if (!formData[field] || formData[field] === '') {
+        setError(`Please fill in the ${field.replace(/_/g, ' ')} field`);
+        setLoading(false);
+        return;
+      }
+    }
+
     // Convert string inputs to numbers
     const payload = {
-      mmsi: formData.mmsi,
+      mmsi: formData.mmsi.trim(),
       avg_speed: parseFloat(formData.avg_speed),
       speed_std: parseFloat(formData.speed_std),
       total_distance_km: parseFloat(formData.total_distance_km),
       time_at_sea_hours: parseFloat(formData.time_at_sea_hours),
-      acceleration_events: parseInt(formData.acceleration_events),
+      acceleration_events: parseInt(formData.acceleration_events, 10),
       length: parseFloat(formData.length),
       width: parseFloat(formData.width),
       draft: parseFloat(formData.draft),
       co2_factor: parseFloat(formData.co2_factor)
     };
+
+    // Validate no NaN values
+    const hasNaN = Object.entries(payload).some(([key, value]) => {
+      if (key === 'mmsi') return false;
+      return isNaN(value);
+    });
+
+    if (hasNaN) {
+      setError('Please ensure all numeric fields contain valid numbers');
+      setLoading(false);
+      return;
+    }
+
+    console.log('Sending payload:', payload);
 
     // Call API
     const response = await apiService.analyzeVessel(payload);
@@ -226,6 +254,7 @@ function AnalyzeVessel() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
                     Avg Speed (knots) <span className="text-red-400">*</span>
+                    <span className="text-xs text-blue-300 ml-2">(0-50)</span>
                   </label>
                   <input
                     type="number"
@@ -233,6 +262,8 @@ function AnalyzeVessel() {
                     value={formData.avg_speed}
                     onChange={handleChange}
                     required
+                    min="0"
+                    max="50"
                     step="0.01"
                     placeholder="19.75"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -241,6 +272,7 @@ function AnalyzeVessel() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
                     Speed Std Dev <span className="text-red-400">*</span>
+                    <span className="text-xs text-blue-300 ml-2">(0-20)</span>
                   </label>
                   <input
                     type="number"
@@ -248,6 +280,8 @@ function AnalyzeVessel() {
                     value={formData.speed_std}
                     onChange={handleChange}
                     required
+                    min="0"
+                    max="20"
                     step="0.01"
                     placeholder="1.8"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -267,6 +301,7 @@ function AnalyzeVessel() {
                     value={formData.total_distance_km}
                     onChange={handleChange}
                     required
+                    min="0"
                     step="0.01"
                     placeholder="87.87"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -282,6 +317,7 @@ function AnalyzeVessel() {
                     value={formData.time_at_sea_hours}
                     onChange={handleChange}
                     required
+                    min="0"
                     step="0.01"
                     placeholder="40"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -300,6 +336,7 @@ function AnalyzeVessel() {
                   value={formData.acceleration_events}
                   onChange={handleChange}
                   required
+                  min="0"
                   placeholder="30"
                   className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
                 />
@@ -310,6 +347,7 @@ function AnalyzeVessel() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
                     Length (m) <span className="text-red-400">*</span>
+                    <span className="text-xs text-blue-300 ml-1">(0-500)</span>
                   </label>
                   <input
                     type="number"
@@ -317,6 +355,8 @@ function AnalyzeVessel() {
                     value={formData.length}
                     onChange={handleChange}
                     required
+                    min="0"
+                    max="500"
                     step="0.01"
                     placeholder="120"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -325,6 +365,7 @@ function AnalyzeVessel() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
                     Width (m) <span className="text-red-400">*</span>
+                    <span className="text-xs text-blue-300 ml-1">(0-100)</span>
                   </label>
                   <input
                     type="number"
@@ -332,6 +373,8 @@ function AnalyzeVessel() {
                     value={formData.width}
                     onChange={handleChange}
                     required
+                    min="0"
+                    max="100"
                     step="0.01"
                     placeholder="20"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -340,6 +383,7 @@ function AnalyzeVessel() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
                     Draft (m) <span className="text-red-400">*</span>
+                    <span className="text-xs text-blue-300 ml-1">(0-50)</span>
                   </label>
                   <input
                     type="number"
@@ -347,6 +391,8 @@ function AnalyzeVessel() {
                     value={formData.draft}
                     onChange={handleChange}
                     required
+                    min="0"
+                    max="50"
                     step="0.01"
                     placeholder="7"
                     className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -358,6 +404,7 @@ function AnalyzeVessel() {
               <div>
                 <label className="block text-sm font-semibold text-white mb-2">
                   CO₂ Factor (kg/fuel unit) <span className="text-red-400">*</span>
+                  <span className="text-xs text-blue-300 ml-2">(0-10)</span>
                 </label>
                 <input
                   type="number"
@@ -365,6 +412,8 @@ function AnalyzeVessel() {
                   value={formData.co2_factor}
                   onChange={handleChange}
                   required
+                  min="0"
+                  max="10"
                   step="0.001"
                   placeholder="3.206"
                   className="w-full px-4 py-3 bg-white/20 border border-white/30 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
@@ -468,12 +517,12 @@ function AnalyzeVessel() {
                 {/* Recommendation Panel */}
                 <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-purple-400/30 p-6">
                   <div>
-                    <h3 className="font-bold text-white mb-2">
-                      Recommendation
+                    <h3 className="font-bold text-white mb-3 text-lg">
+                      AI-Powered Recommendations
                     </h3>
-                    <p className="text-blue-100 text-sm">
-                      {result.recommendation}
-                    </p>
+                    <div className="text-blue-100">
+                      <MarkdownRenderer content={result.recommendation} />
+                    </div>
                   </div>
                 </div>
 

@@ -13,6 +13,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
 import AnalyzeVessel from './pages/AnalyzeVessel.jsx';
 import Home from './pages/Home.jsx';
+import Chatbot from './components/Chatbot.jsx';
 
 function App() {
   return (
@@ -27,6 +28,9 @@ function App() {
         {/* Legacy Home Page - kept for reference */}
         <Route path="/legacy" element={<Home />} />
       </Routes>
+      
+      {/* Global Chatbot - available on all pages */}
+      <Chatbot />
     </Router>
   );
 }

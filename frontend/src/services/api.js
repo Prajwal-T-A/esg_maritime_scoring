@@ -26,6 +26,17 @@ const apiClient = axios.create({
 });
 
 /**
+ * Create a separate axios instance for chat with longer timeout
+ */
+const chatClient = axios.create({
+  baseURL: `${API_BASE_URL}${API_PREFIX}`,
+  timeout: 60000, // 60 second timeout for LLM responses
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+/**
  * API Service Object
  * Contains all API call functions
  */
@@ -110,6 +121,44 @@ const apiService = {
       return {
         success: false,
         error: error.response?.data?.detail || 'Failed to analyze vessel data',
+      };
+    }
+  },
+
+  /**
+   * Send a message to the AI chatbot
+   * @param {string} message - User's message
+   * @param {Array} conversationHistory - Optional conversation history
+   * @returns {Promise} AI response
+   */
+  sendChatMessage: async (message, conversationHistory = []) => {
+    try {
+      const response = await chatClient.post('/chat', {
+        message,
+        conversation_history: conversationHistory,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Chat API Error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Failed to get chatbot response',
+      };
+    }
+  },
+
+  /**
+   * Check Ollama health status
+   * @returns {Promise} Ollama health status and available models
+   */
+  checkOllamaHealth: async () => {
+    try {
+      const response = await apiClient.get('/chat/health');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to check Ollama status',
       };
     }
   },

@@ -164,3 +164,57 @@ class VesselAnalysisResponse(BaseModel):
                 "risk_flags": []
             }
         }
+
+
+class ChatMessage(BaseModel):
+    """Schema for a chat message."""
+    
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
+
+class ChatRequest(BaseModel):
+    """Schema for chat request."""
+    
+    message: str = Field(..., description="User's message to the chatbot")
+    conversation_history: Optional[list[ChatMessage]] = Field(
+        default=None, 
+        description="Optional conversation history"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "What is ESG scoring for vessels?",
+                "conversation_history": []
+            }
+        }
+
+
+class ChatResponse(BaseModel):
+    """Schema for chat response."""
+    
+    message: str = Field(..., description="AI assistant's response")
+    model: str = Field(..., description="Model used for generation")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    success: bool = Field(..., description="Whether the request was successful")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "ESG scoring evaluates vessels based on Environmental, Social, and Governance criteria...",
+                "model": "llama3.2",
+                "timestamp": "2026-01-15T10:30:00Z",
+                "success": True
+            }
+        }
+
+
+class OllamaHealthResponse(BaseModel):
+    """Schema for Ollama health check response."""
+    
+    status: str = Field(..., description="Health status: 'healthy' or 'unhealthy'")
+    available: bool = Field(..., description="Whether Ollama is accessible")
+    models: Optional[list[str]] = Field(default=None, description="Available models")
+    configured_model: str = Field(..., description="Configured model name")
+    model_available: Optional[bool] = Field(default=None, description="Whether configured model is available")

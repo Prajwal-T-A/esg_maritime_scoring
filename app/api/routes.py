@@ -14,11 +14,15 @@ from app.models.schemas import (
     ErrorResponse,
     EmissionPredictionRequest,
     EmissionPredictionResponse,
-    VesselAnalysisResponse
+    VesselAnalysisResponse,
+    ChatRequest,
+    ChatResponse,
+    OllamaHealthResponse
 )
 from app.services.s3_service import s3_service
 from app.services.ml_service import predict_emissions
 from app.services.analysis_service import analyze_vessel
+from app.services.ollama_service import ollama_service
 
 # Create API router
 router = APIRouter()
@@ -336,7 +340,7 @@ async def analyze_vessel_endpoint(request: EmissionPredictionRequest):
     """
     try:
         # Call unified analysis service
-        result = analyze_vessel(
+        result = await analyze_vessel(
             mmsi=request.mmsi,
             avg_speed=request.avg_speed,
             speed_std=request.speed_std,
@@ -365,4 +369,72 @@ async def analyze_vessel_endpoint(request: EmissionPredictionRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    summary="Chat with AI Assistant",
+    description="Send a message to the ESG-focused AI chatbot and receive a response",
+    responses={
+        200: {"description": "Successfully received chat response"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def chat_with_assistant(request: ChatRequest):
+    """
+    Send a message to the Ollama-powered chatbot.
+    
+    Args:
+        request: Chat request with message and optional conversation history
+        
+    Returns:
+        AI assistant's response
+    """
+    try:
+        # Convert Pydantic models to dict for service layer
+        history = None
+        if request.conversation_history:
+            history = [msg.dict() for msg in request.conversation_history]
+        
+        response = await ollama_service.chat(
+            message=request.message,
+            conversation_history=history
+        )
+        
+        return ChatResponse(**response)
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Chat error: {str(e)}"
+        )
+
+
+@router.get(
+    "/chat/health",
+    response_model=OllamaHealthResponse,
+    summary="Check Ollama Status",
+    description="Check if Ollama is running and which models are available",
+    responses={
+        200: {"description": "Ollama health status"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def check_ollama_health():
+    """
+    Check Ollama service health and available models.
+    
+    Returns:
+        Health status including available models
+    """
+    try:
+        health_status = await ollama_service.check_health()
+        return OllamaHealthResponse(**health_status)
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Health check error: {str(e)}"
         )

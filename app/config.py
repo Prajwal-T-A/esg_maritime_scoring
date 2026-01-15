@@ -23,6 +23,10 @@ class Settings:
     # Do NOT hardcode AWS keys here
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
     
+    # Ollama Configuration
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
+    OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    
     # API Configuration
     API_V1_PREFIX: str = "/api/v1"
     
