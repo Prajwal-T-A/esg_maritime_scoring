@@ -13,7 +13,7 @@ function Landing() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background Image with Overlay */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${maritimeBackground})` }}
       >
@@ -31,12 +31,20 @@ function Landing() {
                 Maritime ESG Analytics
               </h1>
             </div>
-            <button
-              onClick={() => navigate('/analyze')}
-              className="px-6 py-2 bg-white/5 text-white rounded-lg border border-white/30 hover:bg-white/10 transition-all duration-300 font-medium"
-            >
-              Analyze Vessel
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/live')}
+                className="text-white hover:text-cyan-300 font-medium transition-colors"
+              >
+                Live Map
+              </button>
+              <button
+                onClick={() => navigate('/analyze')}
+                className="px-6 py-2 bg-white/5 text-white rounded-lg border border-white/30 hover:bg-white/10 transition-all duration-300 font-medium"
+              >
+                Analyze Vessel
+              </button>
+            </div>
           </div>
         </header>
 
@@ -51,9 +59,9 @@ function Landing() {
                   Sustainable Shipping
                 </span>
               </h2>
-              
+
               <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto leading-relaxed">
-                Advanced ML-powered carbon emission tracking and ESG environmental scoring 
+                Advanced ML-powered carbon emission tracking and ESG environmental scoring
                 for maritime vessels
               </p>
             </div>

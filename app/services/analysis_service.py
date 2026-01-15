@@ -18,7 +18,8 @@ async def analyze_vessel(
     length: float,
     width: float,
     draft: float,
-    co2_factor: float
+    co2_factor: float,
+    include_ai_recommendation: bool = True
 ) -> Dict:
     """
     Unified analysis combining ML emission prediction and ESG scoring.
@@ -85,17 +86,19 @@ async def analyze_vessel(
     # Step 3: Interpretation
     interpretation = get_score_interpretation(esg_score)
     
-    # Step 4: Generate AI-powered recommendations using Ollama
-    recommendation = await _generate_ai_recommendation(
-        esg_score=esg_score,
-        rating=interpretation['rating'],
-        estimated_co2_kg=estimated_co2_kg,
-        total_distance_km=total_distance_km,
-        avg_speed=avg_speed,
-        acceleration_events=acceleration_events,
-        time_at_sea_hours=time_at_sea_hours,
-        risk_flags=risk_flags
-    )
+    # Step 4: Generate AI-powered recommendations using Ollama (Optional)
+    recommendation = None
+    if include_ai_recommendation:
+        recommendation = await _generate_ai_recommendation(
+            esg_score=esg_score,
+            rating=interpretation['rating'],
+            estimated_co2_kg=estimated_co2_kg,
+            total_distance_km=total_distance_km,
+            avg_speed=avg_speed,
+            acceleration_events=acceleration_events,
+            time_at_sea_hours=time_at_sea_hours,
+            risk_flags=risk_flags
+        )
     
     return {
         'mmsi': mmsi,

@@ -438,3 +438,29 @@ async def check_ollama_health():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Health check error: {str(e)}"
         )
+
+# WebSocket endpoint for live tracking
+from fastapi import WebSocket, WebSocketDisconnect
+from app.services.live_tracking_service import live_tracking_service
+import asyncio
+
+@router.websocket("/ws/live-vessels")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time vessel tracking.
+    Streams vessel positions and live ESG scores.
+    """
+    await live_tracking_service.connect_client(websocket)
+    try:
+        # Start the background streamer if it's not running
+        # In a production app, this should be a startup event or dedicated worker
+        if not live_tracking_service.is_running:
+             asyncio.create_task(live_tracking_service.stream_ais_data())
+             
+        while True:
+            # Keep connection alive and listen for any client messages (optional)
+            # For now we just discard client messages
+            await websocket.receive_text()
+            
+    except WebSocketDisconnect:
+        live_tracking_service.disconnect_client(websocket)

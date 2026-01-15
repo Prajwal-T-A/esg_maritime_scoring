@@ -12,6 +12,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
 import AnalyzeVessel from './pages/AnalyzeVessel.jsx';
+import LiveTracking from './pages/LiveTracking.jsx';
 import Home from './pages/Home.jsx';
 import Chatbot from './components/Chatbot.jsx';
 
@@ -21,14 +22,17 @@ function App() {
       <Routes>
         {/* Landing Page - New main route */}
         <Route path="/" element={<Landing />} />
-        
+
+        {/* Live Tracking Page */}
+        <Route path="/live" element={<LiveTracking />} />
+
         {/* Analyze Vessel Page */}
         <Route path="/analyze" element={<AnalyzeVessel />} />
-        
+
         {/* Legacy Home Page - kept for reference */}
         <Route path="/legacy" element={<Home />} />
       </Routes>
-      
+
       {/* Global Chatbot - available on all pages */}
       <Chatbot />
     </Router>
