@@ -163,6 +163,37 @@ const apiService = {
       };
     }
   },
+
+  /**
+   * Analyze fleet and generate comprehensive report
+   * @param {Array} vessels - Array of vessel data objects
+   * @param {string} selectedPort - Port filter (default: 'all')
+   * @returns {Promise} Fleet analysis with comprehensive report
+   */
+  analyzeFleet: async (vessels, selectedPort = 'all') => {
+    try {
+      // Create a custom axios instance with extended timeout for fleet reports (3 minutes)
+      const fleetClient = axios.create({
+        baseURL: `${API_BASE_URL}${API_PREFIX}`,
+        timeout: 180000, // 3 minute timeout for comprehensive fleet reports
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const response = await fleetClient.post('/analyze-fleet', {
+        vessels,
+        selected_port: selectedPort,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Fleet Analysis API Error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Failed to analyze fleet',
+      };
+    }
+  },
 };
 
 export default apiService;

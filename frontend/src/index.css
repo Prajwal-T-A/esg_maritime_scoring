@@ -44,3 +44,57 @@ button, input, select {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Print styles for reports */
+@media print {
+  /* Hide navigation, buttons, and non-report elements */
+  header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure report content is visible */
+  body {
+    background: white !important;
+  }
+  
+  /* Make report backgrounds white for printing */
+  .bg-slate-900\/50,
+  .backdrop-blur-md {
+    background: white !important;
+    backdrop-filter: none !important;
+  }
+  
+  /* Adjust text colors for print */
+  .text-white,
+  .text-slate-300,
+  .text-blue-200,
+  .text-cyan-400 {
+    color: #000 !important;
+  }
+  
+  /* Keep colored elements readable */
+  .text-orange-400 {
+    color: #ea580c !important;
+  }
+  
+  .text-green-400 {
+    color: #22c55e !important;
+  }
+  
+  .text-red-400 {
+    color: #ef4444 !important;
+  }
+  
+  /* Page breaks */
+  .page-break {
+    page-break-before: always;
+  }
+  
+  /* Remove borders for cleaner print */
+  .border-white\/20,
+  .border-white\/10 {
+    border-color: #e5e7eb !important;
+  }
+}

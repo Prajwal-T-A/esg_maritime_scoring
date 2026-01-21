@@ -17,11 +17,13 @@ from app.models.schemas import (
     VesselAnalysisResponse,
     ChatRequest,
     ChatResponse,
-    OllamaHealthResponse
+    OllamaHealthResponse,
+    FleetAnalysisRequest,
+    FleetAnalysisResponse
 )
 from app.services.s3_service import s3_service
 from app.services.ml_service import predict_emissions
-from app.services.analysis_service import analyze_vessel
+from app.services.analysis_service import analyze_vessel, analyze_fleet
 from app.services.ollama_service import ollama_service
 
 # Create API router
@@ -439,6 +441,64 @@ async def check_ollama_health():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Health check error: {str(e)}"
         )
+
+
+@router.post(
+    "/analyze-fleet",
+    response_model=FleetAnalysisResponse,
+    summary="Fleet Analysis with AI Report",
+    description="Generate comprehensive fleet environmental performance report with AI-powered insights",
+    responses={
+        200: {"description": "Successfully generated fleet analysis"},
+        400: {"model": ErrorResponse, "description": "Invalid input data"},
+        500: {"model": ErrorResponse, "description": "Analysis failed"}
+    }
+)
+async def analyze_fleet_endpoint(request: FleetAnalysisRequest):
+    """
+    Generate comprehensive fleet analysis report.
+    
+    This endpoint analyzes multiple vessels and provides:
+    1. Aggregated fleet metrics (total emissions, average ESG score, etc.)
+    2. Performance distribution across the fleet
+    3. Top and bottom performer identification
+    4. AI-generated recommendations for fleet-wide improvements
+    5. Regulatory compliance assessment
+    6. Actionable implementation plan
+    
+    Args:
+        request: FleetAnalysisRequest containing vessel list and optional port filter
+        
+    Returns:
+        FleetAnalysisResponse with comprehensive analysis and detailed report
+        
+    Raises:
+        HTTPException: 400 if input validation fails
+        HTTPException: 500 if analysis fails
+    """
+    try:
+        # Convert Pydantic models to dictionaries for service layer
+        vessels_data = [vessel.dict() for vessel in request.vessels]
+        
+        # Call fleet analysis service
+        result = await analyze_fleet(
+            vessels=vessels_data,
+            selected_port=request.selected_port
+        )
+        
+        return FleetAnalysisResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid input data: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Fleet analysis failed: {str(e)}"
+        )
+
 
 # WebSocket endpoint for live tracking
 from fastapi import WebSocket, WebSocketDisconnect

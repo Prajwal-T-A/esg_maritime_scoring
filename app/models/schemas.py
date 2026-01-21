@@ -220,3 +220,36 @@ class OllamaHealthResponse(BaseModel):
     models: Optional[list[str]] = Field(default=None, description="Available models")
     configured_model: str = Field(..., description="Configured model name")
     model_available: Optional[bool] = Field(default=None, description="Whether configured model is available")
+
+
+class FleetVesselData(BaseModel):
+    """Schema for individual vessel data in fleet analysis."""
+    
+    mmsi: str = Field(..., description="Maritime Mobile Service Identity")
+    vessel_name: Optional[str] = Field(None, description="Vessel name")
+    lat: Optional[float] = Field(None, description="Current latitude")
+    lon: Optional[float] = Field(None, description="Current longitude")
+    speed: Optional[float] = Field(None, description="Current speed in knots")
+    estimated_co2_kg: float = Field(..., description="Estimated CO₂ emissions in kg")
+    esg_score: int = Field(..., description="ESG environmental score")
+    sector: Optional[str] = Field(None, description="Port or sector")
+    total_distance_km: Optional[float] = Field(None, description="Total distance traveled")
+    delta_weather: Optional[float] = Field(0, description="Weather impact on emissions")
+
+
+class FleetAnalysisRequest(BaseModel):
+    """Schema for fleet analysis request."""
+    
+    vessels: list[FleetVesselData] = Field(..., description="List of vessels in the fleet")
+    selected_port: Optional[str] = Field("all", description="Filter by port/sector")
+    
+
+class FleetAnalysisResponse(BaseModel):
+    """Schema for fleet analysis response."""
+    
+    total_vessels: int = Field(..., description="Total number of vessels analyzed")
+    total_emissions_kg: float = Field(..., description="Total fleet CO₂ emissions in kg")
+    average_esg_score: float = Field(..., description="Average ESG score across fleet")
+    total_distance_km: float = Field(..., description="Total distance traveled by fleet")
+    detailed_report: str = Field(..., description="Comprehensive AI-generated fleet report")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
